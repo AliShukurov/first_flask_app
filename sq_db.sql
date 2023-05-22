@@ -26,3 +26,10 @@ email text NOT NULL,
 psw text NOT NULL,
 time integer NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS feedbacks (
+id integer PRIMARY KEY AUTOINCREMENT,
+email text NOT NULL,
+feedback text NOT NULL,
+time integer NOT NULL
+);

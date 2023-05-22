@@ -21,6 +21,7 @@ from flask_login import (
     current_user,
 )
 from UserLogin import UserLogin
+from forms import LoginForm, RegisterForm
 
 
 # configuration
@@ -89,16 +90,6 @@ def before_request():
     dbase = FDataBase(db)
 
 
-""" 
-# buttons on main page
-menu = [
-    {"name": "Главная", "url": "/"},
-    {"name": "Установка", "url": "install-flask"},
-    {"name": "Первое приложение", "url": "first-app"},
-    {"name": "Обратная связь", "url": "contact"},
-]
- """
-
 # main page
 
 
@@ -128,10 +119,18 @@ def crupto():
 @app.route("/contact", methods=["POST", "GET"])
 def contact():
     if request.method == "POST":
-        if len(request.form["username"]) > 2:
-            flash("Сообщение отправлено", category="success")
+        if (
+            len(request.form["username"]) > 2
+            and len(request.form["message"]) > 8
+            and "@" in request.form["email"]
+        ):
+            res = dbase.UserFeedback(request.form["email"], request.form["message"])
+            if not res:
+                flash("Ошибка оправки!", category="error")
+            else:
+                flash("Сообщение отправлено", category="success")
         else:
-            flash("Ошибка оправки!", category="error")
+            flash("Заполните данные корректно.", category="error")
     return render_template("contact.html", menu=dbase.getMenu(), title="Обратная связь")
 
 
@@ -177,40 +176,38 @@ def showPost(alias):
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("profile"))
-    if request.method == "POST":
-        user = dbase.getUserByEmail(request.form["email"])
-        if user and check_password_hash(user["psw"], request.form["psw"]):
+
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = dbase.getUserByEmail(form.email.data)
+        if user and check_password_hash(user["psw"], form.psw.data):
             userlogin = UserLogin().create(user)
-            rm = True if request.form.get("remainme") else False
+            rm = form.remember.data
             login_user(userlogin, remember=rm)
             return redirect(request.args.get("next") or url_for("profile"))
 
         flash("Неверная пара логин/пароль", "error")
 
-    return render_template("login.html", menu=dbase.getMenu(), title="Авторизация")
+    return render_template(
+        "login.html", menu=dbase.getMenu(), title="Авторизация", form=form
+    )
 
 
 @app.route("/register", methods=["POST", "GET"])
 def register():
-    if request.method == "POST":
-        session.pop("_flashes", None)
-        if (
-            len(request.form["name"]) >= 2
-            and len(request.form["email"]) > 4
-            and len(request.form["psw"]) > 4
-            and request.form["psw"] == request.form["psw2"]
-        ):
-            hash = generate_password_hash(request.form["psw"])
-            res = dbase.addUser(request.form["name"], request.form["email"], hash)
-            if res:
-                flash("Вы успешно зарегистрированы", "success")
-                return redirect(url_for("login"))
-            else:
-                flash("Ошибка при добавлении в БД", "error")
+    form = RegisterForm()
+    if form.validate_on_submit():
+        hash = generate_password_hash(request.form["psw"])
+        res = dbase.addUser(form.name.data, form.email.data, hash)
+        if res:
+            flash("Вы успешно зарегистрированы", "success")
+            return redirect(url_for("login"))
         else:
-            flash("Неверно заполнены поля", "error")
+            flash("Ошибка при добавлении в БД", "error")
 
-    return render_template("register.html", menu=dbase.getMenu(), title="Регистрация")
+    return render_template(
+        "register.html", menu=dbase.getMenu(), title="Регистрация", form=form
+    )
 
 
 # profile page
